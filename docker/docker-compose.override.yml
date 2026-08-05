@@ -1,0 +1,31 @@
+services:
+  database:
+    # ports SOMAM no merge do compose; !override troca a lista do base.
+    ports: !override
+      - "127.0.0.1:${MYSQL_PORT}:3306"
+
+  login:
+    # so o 8080 (HTTP) precisa ser publico; o gRPC e' interno da rede compose.
+    ports: !override
+      - "${LOGIN_HTTP_PORT}:${LOGIN_HTTP_PORT}"
+      - "127.0.0.1:${LOGIN_GRPC_PORT}:${LOGIN_GRPC_PORT}"
+
+  server:
+    # Crystal salva o mundo no SIGTERM; 10s (default) nao basta.
+    stop_grace_period: 120s
+
+    # SEM tty o start.sh deles queima um core inteiro: o laco de supervisao faz
+    # "read -t 1 -n 1 input" (pra capturar 'q'), e sem terminal o read retorna
+    # EOF na hora, virando busy-loop a 100% de CPU. Com pty o read espera 1s.
+    # De quebra o stdout vira line-buffered e o log passa a sair em tempo real
+    # em vez de ficar preso no buffer de bloco do pipe.
+    tty: true
+    stdin_open: true
+
+    # Roda o binario direto em vez do start.sh deles. Motivo: o start.sh canaliza
+    # a saida por "| awk | tee", entao o stdout do crystalserver vira pipe e fica
+    # BUFFERIZADO EM BLOCO -- o arquivo em logs/ ficava com 0 bytes e nao dava pra
+    # ler erro nenhum enquanto o servidor rodava. Com entrypoint direto + tty a
+    # saida vai pro pty, fica line-buffered e aparece em "docker compose logs".
+    # O restart em caso de crash fica por conta do "restart: unless-stopped".
+    entrypoint: ["/bin/crystalserver"]
