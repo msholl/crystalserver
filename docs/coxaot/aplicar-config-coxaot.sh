@@ -62,3 +62,16 @@ set_lua coinImagesURL     '"https://global.coxaot.com/images/store/"'
 
 echo
 echo "pronto. reinicie o servidor para o config.lua ser relido."
+echo
+cat <<'NOTA'
+Fora do config.lua, dois ajustes vivem no MyAAC (/var/www/myaac/config.local.php):
+
+  $config['client_link'] = 'https://global.coxaot.com/download/CoxaOT-Crystal.zip';
+      o default do MyAAC aponta para as releases do gameclient do zimbadev, que
+      nem tem arquivo publicado para 15.25.
+
+E os administradores do site sao por accounts.web_flags (FLAG_ADMIN = 1,
+FLAG_SUPER_ADMIN = 2, em common.php), nao por accounts.type:
+
+  UPDATE accounts SET web_flags = 3 WHERE email IN ('...');
+NOTA
