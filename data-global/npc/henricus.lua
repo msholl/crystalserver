@@ -52,6 +52,30 @@ end
 
 local flaskCost = 1000
 
+-- O que este NPC vende: VIP leva as 7 bencaos (REGULAR + ENHANCED), nao-VIP leva
+-- as 5 REGULAR. A Twist of Fate (PvP) nunca entra -- ela e' vendida a parte.
+--
+-- Nao uso Blessings.getInquisitionPrice porque ele so conta as marcadas
+-- inquisition = true, ou seja as 5: um VIP que ja as tivesse veria missing = 0 e
+-- nao conseguiria comprar as ENHANCED que faltam.
+--
+-- Cobra por bencao recebida, e as ENHANCED custam mais (flag do getBlessingCost).
+local function inquisitionOffer(player)
+	local isVipPlayer = player:isVip()
+	local missing, price = 0, 0
+
+	for id, bless in pairs(Blessings.All) do
+		local enhanced = bless.type == Blessings.Types.ENHANCED
+		local sells = bless.type == Blessings.Types.REGULAR or (isVipPlayer and enhanced)
+		if sells and not player:hasBlessing(id) then
+			missing = missing + 1
+			price = price + Blessings.getBlessingCost(player:getLevel(), false, enhanced)
+		end
+	end
+
+	return missing, math.floor(price * Blessings.Config.InquisitonBlessPriceMultiplier), isVipPlayer
+end
+
 local function creatureSayCallback(npc, creature, type, message)
 	local player = Player(creature)
 	local playerId = player:getId()
@@ -60,7 +84,7 @@ local function creatureSayCallback(npc, creature, type, message)
 		return false
 	end
 
-	local missing, totalBlessPrice = Blessings.getInquisitionPrice(player)
+	local missing, totalBlessPrice, isVipPlayer = inquisitionOffer(player)
 
 	if MsgContains(message, "inquisitor") then
 		npcHandler:say("The churches of the gods entrusted me with the enormous and responsible task to lead the inquisition. I leave the field work to inquisitors who I recruit from fitting people that cross my way.", npc, creature)
@@ -70,12 +94,14 @@ local function creatureSayCallback(npc, creature, type, message)
 			npcHandler:setTopic(playerId, 2)
 		end
 	elseif MsgContains(message, "blessing") or MsgContains(message, "bless") then
-		if player:getStorageValue(Storage.Quest.U8_2.TheInquisitionQuest.Questline) == 25 then --if quest is done
-			npcHandler:say("Do you want to receive the blessing of the inquisition - which means " .. (missing == 5 and "all five available" or missing) .. " blessings - for " .. totalBlessPrice .. " gold?", npc, creature)
-			npcHandler:setTopic(playerId, 7)
-		else
-			npcHandler:say("You cannot get this blessing unless you have completed The Inquisition Quest.", npc, creature)
+		-- Sem exigir a Inquisition Quest: qualquer um compra.
+		if missing == 0 then
+			npcHandler:say("You already carry every blessing I can grant, |PLAYERNAME|.", npc, creature)
 			npcHandler:setTopic(playerId, 0)
+		else
+			local howMany = isVipPlayer and "seven" or "five"
+			npcHandler:say("Do you want to receive the blessing of the inquisition - which means " .. (missing == (isVipPlayer and 7 or 5) and ("all " .. howMany .. " available") or missing) .. " blessings - for " .. totalBlessPrice .. " gold?", npc, creature)
+			npcHandler:setTopic(playerId, 7)
 		end
 	elseif MsgContains(message, "flask") or MsgContains(message, "special flask") then
 		if player:getStorageValue(Storage.Quest.U8_2.TheInquisitionQuest.Questline) >= 12 then -- give player the ability to purchase the flask.
@@ -243,21 +269,18 @@ local function creatureSayCallback(npc, creature, type, message)
 			if missing == 0 then
 				npcHandler:say("You already have been blessed!", npc, creature)
 			elseif player:removeMoneyBank(totalBlessPrice) then
-				-- VIP leva as 7 bencaos (5 REGULAR + 2 ENHANCED) pelo preco das 5.
-				-- addMissingBless(true) nao serve: `all` inclui a Twist of Fate,
-				-- que e' PvP, e daria 8. Dai o laco filtrando o tipo.
-				if player:isVip() then
-					for id, bless in pairs(Blessings.All) do
-						if bless.type ~= Blessings.Types.PvP and not player:hasBlessing(id) then
-							player:addBlessing(id, 1)
-						end
+				-- Concede exatamente o que foi cobrado no inquisitionOffer.
+				-- addMissingBless nao serve aqui: com all = false ele ignora as
+				-- ENHANCED, e com all = true inclui a Twist of Fate (PvP).
+				for id, bless in pairs(Blessings.All) do
+					local enhanced = bless.type == Blessings.Types.ENHANCED
+					local sells = bless.type == Blessings.Types.REGULAR or (isVipPlayer and enhanced)
+					if sells and not player:hasBlessing(id) then
+						player:addBlessing(id, 1)
 					end
-					player:sendBlessStatus()
-					npcHandler:say("As a VIP you receive all seven blessings, |PLAYERNAME|.", npc, creature)
-				else
-					npcHandler:say("You have been blessed by all of five gods!, |PLAYERNAME|.", npc, creature)
-					player:addMissingBless(false)
 				end
+				player:sendBlessStatus()
+				npcHandler:say(isVipPlayer and "As a VIP you receive all seven blessings, |PLAYERNAME|." or "You have been blessed by all of five gods!, |PLAYERNAME|.", npc, creature)
 				player:getPosition():sendMagicEffect(CONST_ME_HOLYAREA)
 			else
 				npcHandler:say("Come back when you have enough money.", npc, creature)
