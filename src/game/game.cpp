@@ -7721,6 +7721,20 @@ bool Game::combatChangeHealth(const std::shared_ptr<Creature> &attacker, const s
 		return false;
 	}
 
+	// VIP (CoxaOT): familiar do VIP causa 30% mais dano com suas magias.
+	// Aqui, e nao em cada magia do familiar, porque todo dano passa por este
+	// ponto -- inclusive o que vier de scripts novos.
+	if (attacker && damage.primary.value < 0) {
+		if (const auto &attackerMonster = attacker->getMonster(); attackerMonster && attackerMonster->isFamiliar()) {
+			if (const auto &master = attackerMonster->getMaster(); master) {
+				if (const auto &masterPlayer = master->getPlayer(); masterPlayer && masterPlayer->isVip()) {
+					damage.primary.value = static_cast<int32_t>(damage.primary.value * 1.30);
+					damage.secondary.value = static_cast<int32_t>(damage.secondary.value * 1.30);
+				}
+			}
+		}
+	}
+
 	const Position &targetPos = target->getPosition();
 	if (damage.primary.value > 0) {
 		if (target->getHealth() <= 0) {

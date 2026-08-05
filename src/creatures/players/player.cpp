@@ -985,6 +985,13 @@ void Player::updateInventoryImbuement() {
 				continue;
 			}
 
+			// VIP (CoxaOT): dentro de protection zone nenhum imbuement e' consumido.
+			// O upstream, logo acima, ja poupa os AGRESSIVOS; este trecho estende
+			// aos demais (capacidade, skill...), que continuariam decaindo.
+			if (isInProtectionZone && isVip()) {
+				continue;
+			}
+
 			// If the imbuement's duration is 0, remove its stats and continue to the next slot
 			if (imbuementInfo.duration == 0) {
 				removeItemImbuementStats(imbuement);
@@ -7411,6 +7418,12 @@ uint16_t Player::getSkillLevel(skills_t skill) const {
 		skillLevel += equippedWeaponProficiency.critExtraDamage; // Proficiency Perk: critExtraDamage
 	} else if (skill == SKILL_CRITICAL_HIT_CHANCE) {
 		skillLevel += 500; // Vocation Adjustment - Flag Bonus
+		// VIP (CoxaOT): +3% de chance de critico. A rolagem em
+		// Combat::applyExtensions e' "uniform_random(1,100) * 100 <= chance",
+		// entao a escala e 10000 = 100% e 3% vale 300.
+		if (isVip()) {
+			skillLevel += 300;
+		}
 		skillLevel += equippedWeaponProficiency.critHitChance; // Vocation Adjustment - Proficiency Perk: critHitChance
 
 		const int32_t avatarCritChance = m_wheelPlayer->checkAvatarSkill(WheelAvatarSkill_t::CRITICAL_CHANCE);
@@ -12762,7 +12775,11 @@ EquippedWeaponProficiencyBonuses &Player::getEquippedWeaponProficiency() {
 
 void Player::addWeaponProficiencyExperience(const std::shared_ptr<MonsterType> &mType, const ForgeClassifications_t classification, const bool bossSoulpit) {
 	uint32_t addProficiencyExperience = 0;
-	const auto weaponProficiencyRate = std::max(0.0f, g_configManager().getFloat(RATE_WEAPON_PROFICIENCY));
+	auto weaponProficiencyRate = std::max(0.0f, g_configManager().getFloat(RATE_WEAPON_PROFICIENCY));
+	// VIP (CoxaOT): +10% de experiencia de proficiencia de arma.
+	if (isVip()) {
+		weaponProficiencyRate *= 1.10f;
+	}
 	if (bossSoulpit) {
 		addProficiencyExperience = 1500;
 	} else {

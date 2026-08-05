@@ -138,7 +138,12 @@ local function exerciseTrainingEvent(playerId, tilePosition, weaponId, dummyId)
 	end
 
 	local vocation = player:getVocation()
-	_G.OnExerciseTraining[playerId].event = addEvent(exerciseTrainingEvent, (vocation:getBaseAttackSpeed() / configManager.getFloat(configKeys.RATE_EXERCISE_TRAINING_SPEED)) * eventSpeedMultiplier, playerId, tilePosition, weaponId, dummyId)
+
+	-- VIP (CoxaOT): exercise weapons 10% mais rapidas. O valor aqui e o INTERVALO
+	-- entre golpes, entao 10% mais rapido significa DIVIDIR por 1.10.
+	local vipSpeedRate = player:isVip() and 1.10 or 1.0
+
+	_G.OnExerciseTraining[playerId].event = addEvent(exerciseTrainingEvent, (vocation:getBaseAttackSpeed() / (configManager.getFloat(configKeys.RATE_EXERCISE_TRAINING_SPEED) * vipSpeedRate)) * eventSpeedMultiplier, playerId, tilePosition, weaponId, dummyId)
 	return true
 end
 
