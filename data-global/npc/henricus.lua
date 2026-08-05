@@ -243,8 +243,21 @@ local function creatureSayCallback(npc, creature, type, message)
 			if missing == 0 then
 				npcHandler:say("You already have been blessed!", npc, creature)
 			elseif player:removeMoneyBank(totalBlessPrice) then
-				npcHandler:say("You have been blessed by all of five gods!, |PLAYERNAME|.", npc, creature)
-				player:addMissingBless(false)
+				-- VIP leva as 7 bencaos (5 REGULAR + 2 ENHANCED) pelo preco das 5.
+				-- addMissingBless(true) nao serve: `all` inclui a Twist of Fate,
+				-- que e' PvP, e daria 8. Dai o laco filtrando o tipo.
+				if player:isVip() then
+					for id, bless in pairs(Blessings.All) do
+						if bless.type ~= Blessings.Types.PvP and not player:hasBlessing(id) then
+							player:addBlessing(id, 1)
+						end
+					end
+					player:sendBlessStatus()
+					npcHandler:say("As a VIP you receive all seven blessings, |PLAYERNAME|.", npc, creature)
+				else
+					npcHandler:say("You have been blessed by all of five gods!, |PLAYERNAME|.", npc, creature)
+					player:addMissingBless(false)
+				end
 				player:getPosition():sendMagicEffect(CONST_ME_HOLYAREA)
 			else
 				npcHandler:say("Come back when you have enough money.", npc, creature)
