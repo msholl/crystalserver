@@ -782,6 +782,18 @@ void Spell::applyCooldownConditions(const std::shared_ptr<Player> &player) const
 		g_logger().debug("[{}] spell name: {}, spellCooldown: {}, bonus: {}, augment {}", __FUNCTION__, name, spellCooldown, player->wheel()->getSpellBonus(name, WheelSpellBoost_t::COOLDOWN), augmentCooldownReduction);
 		spellCooldown -= player->wheel()->getSpellBonus(name, WheelSpellBoost_t::COOLDOWN);
 		spellCooldown -= augmentCooldownReduction;
+
+		// VIP (CoxaOT): 30% menos cooldown nas magias Avatar. Precisa ser aqui, e nao
+		// no Lua: spell:cooldown() e' declarado FORA do onCastSpell (avatar_of_*.lua),
+		// entao vale igual para todo mundo e nao ha gancho por jogador. Este metodo e'
+		// o unico ponto por onde todo cooldown de magia passa. O filtro pelo nome
+		// mantem o efeito restrito aos cinco Avatar (Light/Storm/Nature/Steel/Balance).
+		// Aplicado ANTES do piso de 50% logo abaixo, entao o limite do upstream
+		// continua valendo -- na pratica 2h vira 1h24, bem acima do piso de 1h.
+		if (player->isVip() && name.starts_with("Avatar of ")) {
+			spellCooldown = static_cast<int32_t>(spellCooldown * 0.70);
+		}
+
 		const int32_t halfBaseCooldown = cooldown / 2;
 		spellCooldown = halfBaseCooldown > spellCooldown ? halfBaseCooldown : spellCooldown; // The cooldown should never be reduced less than half (50%) of its base cooldown
 		if (spellCooldown > 0) {
