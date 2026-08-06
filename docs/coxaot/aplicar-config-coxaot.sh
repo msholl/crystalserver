@@ -70,6 +70,13 @@ Fora do config.lua, dois ajustes vivem no MyAAC (/var/www/myaac/config.local.php
       o default do MyAAC aponta para as releases do gameclient do zimbadev, que
       nem tem arquivo publicado para 15.25.
 
+  $config['character_towns'] = array(8);
+      personagem novo nasce em THAIS. O CreateCharacter.php:122 faz
+      setTownId($town) SOBRESCREVENDO a town do sample -- os samples de vocacao
+      ja sao level 8 / town 8, entao o array(1) do config.php e' o unico motivo
+      de todo mundo nascer na ilha inicial (town 1 = Dawnport Tutorial).
+      Com um item so na lista, o site nem mostra o seletor de cidade.
+
 E os administradores do site sao por accounts.web_flags (FLAG_ADMIN = 1,
 FLAG_SUPER_ADMIN = 2, em common.php), nao por accounts.type:
 
