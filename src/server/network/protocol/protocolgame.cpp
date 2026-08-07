@@ -7871,7 +7871,13 @@ void ProtocolGame::sendAddCreature(const std::shared_ptr<Creature> &creature, co
 	}
 
 	if (creature != player) {
-		if (stackpos >= 10) {
+		if (stackpos < 0 || stackpos >= 10) {
+			// Sem stackpos utilizavel: redescreve o tile inteiro em vez de nao mandar
+			// nada, senao o cliente nunca fica sabendo que a criatura esta ali.
+			const auto &tile = g_game().map.getTile(pos);
+			if (tile) {
+				sendUpdateTile(tile, pos);
+			}
 			return;
 		}
 
@@ -8030,7 +8036,13 @@ void ProtocolGame::sendAddCreature(const std::shared_ptr<Creature> &creature, co
 
 void ProtocolGame::sendMoveCreature(const std::shared_ptr<Creature> &creature, const Position &newPos, int32_t newStackPos, const Position &oldPos, int32_t oldStackPos, bool teleport) {
 	if (creature == player) {
-		if (oldStackPos >= 10) {
+		// ATENCAO ao sinal: getStackposOfCreature devolve -1 quando o tile passou das
+		// 10 coisas do protocolo, e "-1 >= 10" e FALSO -- o valor escapava da guarda e
+		// virava 255 no static_cast<uint8_t> abaixo. O cliente entao removia/adicionava
+		// na posicao 255, que nao existe: a criatura morta ficava presa no mapa dele
+		// (aparecia no battle com a barra vazia), o sqm ficava intransponivel, e look e
+		// loot erravam o alvo com "Sorry, not possible".
+		if (oldStackPos < 0 || oldStackPos >= 10) {
 			sendMapDescription(newPos);
 		} else if (teleport) {
 			NetworkMessage msg;
@@ -8072,7 +8084,7 @@ void ProtocolGame::sendMoveCreature(const std::shared_ptr<Creature> &creature, c
 			writeToOutputBuffer(msg);
 		}
 	} else if (canSee(oldPos) && canSee(newPos)) {
-		if (teleport || (oldPos.z == MAP_INIT_SURFACE_LAYER && newPos.z >= MAP_INIT_SURFACE_LAYER + 1) || oldStackPos >= 10) {
+		if (teleport || (oldPos.z == MAP_INIT_SURFACE_LAYER && newPos.z >= MAP_INIT_SURFACE_LAYER + 1) || oldStackPos < 0 || oldStackPos >= 10) {
 			sendRemoveTileThing(oldPos, oldStackPos);
 			sendAddCreature(creature, newPos, newStackPos, false);
 		} else {
