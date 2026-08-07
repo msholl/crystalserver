@@ -42,6 +42,7 @@ local exerciseWeaponsTable = {
 
 local dummies = Game.getDummies()
 
+
 local function leaveExerciseTraining(playerId, targetItem)
 	if _G.OnExerciseTraining[playerId] then
 		stopEvent(_G.OnExerciseTraining[playerId].event)
@@ -151,6 +152,27 @@ local function isDummy(id)
 	return dummies[id] and dummies[id] > 0
 end
 
+-- O cliente escolhe SOZINHO o que voce mirou, e ele nunca escolhe o dummy quando ha
+-- tapete no mesmo sqm: o getTopMultiUseThing() do OTClient (src/client/tile.cpp) pula
+-- coisas marcadas como onBottom -- que e' exatamente a flag dos dummies -- e acaba
+-- devolvendo o tapete. Em sqm limpo funciona por sorte: nao sobra outra coisa para ele
+-- escolher. O servidor entao recebia o id do tapete, isDummy dava falso e a acao era
+-- recusada com "You cannot use this object".
+-- Como o alvo esta no MESMO tile do dummy, basta procurar o dummy ali e seguir com ele.
+local function acharDummyNoTile(position)
+	local tile = Tile(position)
+	if not tile then
+		return nil, nil
+	end
+	for dummyId in pairs(dummies) do
+		local encontrado = tile:getItemById(dummyId)
+		if encontrado then
+			return encontrado, dummyId
+		end
+	end
+	return nil, nil
+end
+
 local exerciseTraining = Action()
 
 function exerciseTraining.onUse(player, item, fromPosition, target, toPosition, isHotkey)
@@ -162,6 +184,14 @@ function exerciseTraining.onUse(player, item, fromPosition, target, toPosition, 
 	local targetId = target:getId()
 
 	local targetItem = Item(target.uid)
+
+	if not isDummy(targetId) then
+		local dummyNoTile, dummyIdNoTile = acharDummyNoTile(target:getPosition())
+		if dummyNoTile then
+			targetItem, targetId = dummyNoTile, dummyIdNoTile
+		end
+	end
+
 	if targetItem and isDummy(targetId) then
 		if _G.OnExerciseTraining[playerId] then
 			player:sendTextMessage(MESSAGE_FAILURE, "You are already training!")
@@ -218,6 +248,7 @@ function exerciseTraining.onUse(player, item, fromPosition, target, toPosition, 
 		end
 		return true
 	end
+
 	return false
 end
 
