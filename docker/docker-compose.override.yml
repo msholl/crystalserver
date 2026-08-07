@@ -11,6 +11,12 @@ services:
       - "127.0.0.1:${LOGIN_GRPC_PORT}:${LOGIN_GRPC_PORT}"
 
   server:
+    # O container tem NAMESPACE DE REDE PROPRIO: o sysctl de congestionamento do
+    # host nao vale aqui dentro. Sem isto as conexoes de jogo continuam em cubic
+    # mesmo com o host em bbr -- conferido com "nsenter -t <pid> -n ss -ti".
+    sysctls:
+      - net.ipv4.tcp_congestion_control=bbr
+
     # Crystal salva o mundo no SIGTERM; 10s (default) nao basta.
     stop_grace_period: 120s
 

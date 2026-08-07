@@ -6992,6 +6992,15 @@ void Player::sendAddTileItem(const std::shared_ptr<Tile> &itemTile, const Positi
 		int32_t stackpos = itemTile->getStackposOfItem(static_self_cast<Player>(), item);
 		if (stackpos != -1) {
 			client->sendAddTileItem(pos, stackpos, item);
+		} else {
+			// Tile passou do limite de 10 coisas do protocolo, entao nao ha stackpos
+			// para descrever a mudanca. Antes o servidor simplesmente NAO ENVIAVA nada,
+			// e a partir dai a visao do cliente daquele tile ficava divergente ate a
+			// proxima descricao completa do mapa (troca de andar). Isso produzia, em
+			// jogo: corpo que nunca aparece, sqm intransponivel por criatura fantasma
+			// que ja morreu, e o personagem "pulando" ao ser corrigido. Redescrever o
+			// tile inteiro mantem cliente e servidor coerentes.
+			client->sendUpdateTile(itemTile, pos);
 		}
 	}
 }
@@ -7001,13 +7010,25 @@ void Player::sendUpdateTileItem(const std::shared_ptr<Tile> &updateTile, const P
 		int32_t stackpos = updateTile->getStackposOfItem(static_self_cast<Player>(), item);
 		if (stackpos != -1) {
 			client->sendUpdateTileItem(pos, stackpos, item);
+		} else {
+			client->sendUpdateTile(updateTile, pos);
 		}
 	}
 }
 
 void Player::sendRemoveTileThing(const Position &pos, int32_t stackpos) const {
-	if (stackpos != -1 && client) {
+	if (!client) {
+		return;
+	}
+
+	if (stackpos != -1) {
 		client->sendRemoveTileThing(pos, stackpos);
+		return;
+	}
+
+	const auto &tile = g_game().map.getTile(pos);
+	if (tile) {
+		client->sendUpdateTile(tile, pos);
 	}
 }
 
